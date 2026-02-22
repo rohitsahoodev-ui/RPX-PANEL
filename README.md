@@ -30,10 +30,12 @@ sudo lxd init --auto
    ```bash
    cd rdx-panel
    ```
-3. Install dependencies:
+3. **Install Dependencies (CRITICAL)**:
+   This step installs `vite`, `tsx`, and other required tools.
    ```bash
    npm install
    ```
+   *If you see "command not found" later, it's usually because this step was skipped or failed.*
 
 ## Step 3: Configuration
 
@@ -76,6 +78,14 @@ DEBUG=False
    sudo npm install -g pm2 tsx
    pm2 start server.ts --interpreter tsx --name rdx-panel
    ```
+
+### Troubleshooting: "command not found" (vite, tsx, etc.)
+If `npm run build` or `npm start` fails with "not found":
+1. Run `npm install` in the project root.
+2. Check if `node_modules` folder exists.
+3. Try using `npx`:
+   - `npx vite build`
+   - `npx tsx server.ts`
 
 ### Troubleshooting: "Unknown file extension .ts"
 If you see an error like `ERR_UNKNOWN_FILE_EXTENSION`, it means Node is trying to run the `.ts` file directly without a transpiler. 
