@@ -5,21 +5,33 @@ RDX VPS Panel is a modern, enterprise-grade LXC/LXD control panel. Follow these 
 ## Prerequisites
 
 - **OS**: Ubuntu 22.04 or 24.04 (Recommended)
-- **Node.js**: v18 or higher
+- **Node.js**: **v20 or higher (CRITICAL)**
+- **Build Tools**: Required for `better-sqlite3` (Python3, g++, make)
 - **LXC/LXD**: Installed and initialized (`lxd init`)
 - **Root Access**: Required for executing LXC commands and port forwarding.
 
 ## Step 1: System Preparation
 
-Update your system and install necessary tools:
-
+### 1. Update Node.js to v20+ (Required)
+The panel requires modern Node.js. If you have v12 or v14, it will NOT work.
 ```bash
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y nodejs npm lxd iptables
+# Remove old node if present
+sudo apt remove -y nodejs npm
+# Install Node.js v20
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
 ```
 
-Ensure LXD is initialized:
+### 2. Install Build Tools (For better-sqlite3)
+`better-sqlite3` needs to compile during installation.
 ```bash
+sudo apt install -y build-essential python3
+```
+
+### 3. Install LXD and Tools
+```bash
+sudo apt update
+sudo apt install -y lxd iptables
 sudo lxd init --auto
 ```
 
