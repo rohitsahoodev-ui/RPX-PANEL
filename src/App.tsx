@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation, useParams } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Server, 
@@ -74,7 +74,7 @@ const StatCard = ({ label, value, icon: Icon, color }: { label: string, value: s
 
 // --- Pages ---
 
-const Login = () => {
+const Login = ({ config }: { config: any }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -106,8 +106,8 @@ const Login = () => {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 mb-4 shadow-lg shadow-blue-600/20">
             <Server size={32} className="text-white" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">RPX PANEL</h1>
-          <p className="text-slate-500 mt-2">Enterprise LXC Control Panel</p>
+          <h1 className="text-3xl font-bold tracking-tight">{config?.panelName || 'RPX PANEL'}</h1>
+          <p className="text-slate-500 mt-2">{config?.welcomeMessage || 'Enterprise LXC Control Panel'}</p>
         </div>
         
         <form onSubmit={handleSubmit} className="card p-8 space-y-6">
@@ -134,6 +134,9 @@ const Login = () => {
           </div>
           <button type="submit" className="btn-primary w-full py-3 text-lg">Sign In</button>
         </form>
+        {config?.watermark && (
+          <p className="text-center text-slate-600 text-xs mt-8 uppercase tracking-widest">{config.watermark}</p>
+        )}
       </div>
     </div>
   );
@@ -292,7 +295,7 @@ const Containers = () => {
             {containers.map(c => (
               <tr key={c.id} className="hover:bg-slate-800/20 transition-colors group">
                 <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
+                  <Link to={`/containers/${c.id}`} className="flex items-center gap-3 hover:text-blue-400 transition-colors">
                     <div className="p-2 rounded-lg bg-slate-800 text-blue-400">
                       <Cpu size={18} />
                     </div>
@@ -300,7 +303,7 @@ const Containers = () => {
                       <p className="font-medium">{c.name}</p>
                       <p className="text-xs text-slate-500">{c.os}</p>
                     </div>
-                  </div>
+                  </Link>
                 </td>
                 <td className="px-6 py-4">
                   <span className={cn(
@@ -477,7 +480,7 @@ const NetworkPage = () => {
   );
 };
 
-const Layout = ({ children }: { children: React.ReactNode }) => {
+const Layout = ({ children, config }: { children: React.ReactNode, config: any }) => {
   const { logout, user } = useAuth();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -495,8 +498,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
               <Server size={20} className="text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">RPX PANEL</h1>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">v2.0 Enterprise</p>
+              <h1 className="text-xl font-bold tracking-tight">{config?.panelName || 'RPX PANEL'}</h1>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{config?.watermark || 'v2.0 Enterprise'}</p>
             </div>
           </div>
 
@@ -579,22 +582,458 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-const AppContent = () => {
-  const { isAuthenticated } = useAuth();
+const PackagesPage = () => {
+  const [packages, setPackages] = useState<VpsPackage[]>([]);
+  const { token } = useAuth();
 
-  if (!isAuthenticated) return <Login />;
+  useEffect(() => {
+    fetch('/api/packages', { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => res.json())
+      .then(setPackages);
+  }, [token]);
 
   return (
-    <Layout>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">VPS Packages</h2>
+        <button className="btn-primary flex items-center gap-2">
+          <Plus size={18} />
+          Create Package
+        </button>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {packages.map(p => (
+          <div key={p.id} className="card p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-violet-600/10 text-violet-500">
+                <Package size={20} />
+              </div>
+              <h3 className="font-bold text-lg">{p.name}</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-4 py-4 border-y border-slate-800/50">
+              <div className="space-y-1">
+                <p className="text-xs text-slate-500 uppercase font-bold">RAM</p>
+                <p className="font-medium">{p.ram} MB</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-slate-500 uppercase font-bold">CPU</p>
+                <p className="font-medium">{p.cpu} Cores</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-slate-500 uppercase font-bold">Disk</p>
+                <p className="font-medium">{p.disk} GB</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-slate-500 uppercase font-bold">Bandwidth</p>
+                <p className="font-medium">{p.bandwidth} GB</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button className="flex-1 py-2 text-xs font-medium bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors">Edit</button>
+              <button className="p-2 text-slate-400 hover:text-red-500 transition-colors">
+                <Trash2 size={16} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const UsersPage = () => {
+  const [users, setUsers] = useState<User[]>([]);
+  const { token } = useAuth();
+
+  useEffect(() => {
+    fetch('/api/users', { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => res.json())
+      .then(setUsers);
+  }, [token]);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">User Management</h2>
+        <button className="btn-primary flex items-center gap-2">
+          <Plus size={18} />
+          Add User
+        </button>
+      </div>
+      <div className="card overflow-hidden">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="bg-slate-800/30 text-slate-400 text-xs uppercase tracking-wider">
+              <th className="px-6 py-4 font-semibold">Username</th>
+              <th className="px-6 py-4 font-semibold">Role</th>
+              <th className="px-6 py-4 font-semibold">Quotas (RAM/CPU/Disk)</th>
+              <th className="px-6 py-4 font-semibold">Joined</th>
+              <th className="px-6 py-4 font-semibold text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-800/50">
+            {users.map(u => (
+              <tr key={u.id} className="hover:bg-slate-800/20 transition-colors">
+                <td className="px-6 py-4 font-medium">{u.username}</td>
+                <td className="px-6 py-4">
+                  <span className={cn(
+                    "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+                    u.role === 'admin' ? "bg-blue-500/10 text-blue-500" : "bg-slate-500/10 text-slate-500"
+                  )}>
+                    {u.role}
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-sm text-slate-400">
+                  {u.ram_quota}MB / {u.cpu_quota} Cores / {u.disk_quota}GB
+                </td>
+                <td className="px-6 py-4 text-sm text-slate-400">{new Date(u.created_at).toLocaleDateString()}</td>
+                <td className="px-6 py-4 text-right">
+                  <button className="p-2 text-slate-400 hover:text-blue-500 transition-colors"><Settings size={18} /></button>
+                  <button className="p-2 text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={18} /></button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+const BackupsPage = () => {
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold">System Backups</h2>
+      <div className="card p-12 text-center space-y-4">
+        <div className="inline-flex p-4 rounded-full bg-blue-500/10 text-blue-500">
+          <Database size={48} />
+        </div>
+        <h3 className="text-xl font-bold">Automated Backups</h3>
+        <p className="text-slate-400 max-w-md mx-auto">Configure system-wide automated backups to remote storage providers like S3, Backblaze, or local disk.</p>
+        <button className="btn-primary">Configure Backup Storage</button>
+      </div>
+    </div>
+  );
+};
+
+const LogsPage = () => {
+  const [logs, setLogs] = useState<any[]>([]);
+  const { token } = useAuth();
+
+  useEffect(() => {
+    fetch('/api/logs', { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => res.json())
+      .then(setLogs);
+  }, [token]);
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold">System Activity Logs</h2>
+      <div className="card overflow-hidden">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="bg-slate-800/30 text-slate-400 text-xs uppercase tracking-wider">
+              <th className="px-6 py-4 font-semibold">User</th>
+              <th className="px-6 py-4 font-semibold">Action</th>
+              <th className="px-6 py-4 font-semibold">Details</th>
+              <th className="px-6 py-4 font-semibold">IP Address</th>
+              <th className="px-6 py-4 font-semibold">Date</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-800/50">
+            {logs.map(l => (
+              <tr key={l.id} className="text-sm">
+                <td className="px-6 py-4 font-medium">{l.username}</td>
+                <td className="px-6 py-4">
+                  <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] font-bold uppercase">
+                    {l.action}
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-slate-400">{l.details}</td>
+                <td className="px-6 py-4 text-slate-500 font-mono">{l.ip_address}</td>
+                <td className="px-6 py-4 text-slate-500">{new Date(l.created_at).toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+const ContainerDetails = () => {
+  const { id } = useParams<{ id: string }>();
+  const { token } = useAuth();
+  const [container, setContainer] = useState<Container | null>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'snapshots' | 'firewall' | 'files' | 'console'>('overview');
+  const [snapshots, setSnapshots] = useState<any[]>([]);
+  const [firewall, setFirewall] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch('/api/containers', { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => res.json())
+      .then(data => setContainer(data.find((c: any) => c.id === Number(id))));
+  }, [id, token]);
+
+  useEffect(() => {
+    if (activeTab === 'snapshots') {
+      fetch(`/api/containers/${id}/snapshots`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(res => res.json())
+        .then(setSnapshots);
+    } else if (activeTab === 'firewall') {
+      fetch(`/api/containers/${id}/firewall`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(res => res.json())
+        .then(setFirewall);
+    }
+  }, [activeTab, id, token]);
+
+  if (!container) return <div className="p-8 text-center text-slate-500">Loading container details...</div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link to="/containers" className="p-2 hover:bg-slate-800 rounded-lg text-slate-400"><ChevronRight className="rotate-180" /></Link>
+          <div>
+            <h2 className="text-2xl font-bold">{container.name}</h2>
+            <p className="text-slate-400 text-sm">{container.os} • {container.node_name}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="btn-primary flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700">
+            <Power size={18} /> Start
+          </button>
+          <button className="btn-primary flex items-center gap-2 bg-slate-800 hover:bg-slate-700">
+            <RefreshCw size={18} /> Restart
+          </button>
+          <button className="btn-primary flex items-center gap-2 bg-red-600 hover:bg-red-700">
+            <Trash2 size={18} /> Delete
+          </button>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-1 border-b border-slate-800">
+        {(['overview', 'snapshots', 'firewall', 'files', 'console'] as const).map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={cn(
+              "px-6 py-3 text-sm font-medium capitalize transition-colors relative",
+              activeTab === tab ? "text-blue-500" : "text-slate-400 hover:text-slate-200"
+            )}
+          >
+            {tab}
+            {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500" />}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-6">
+        {activeTab === 'overview' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="card p-6">
+                <h3 className="text-lg font-bold mb-4">Resource Utilization</h3>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={[{n: '1', v: 10}, {n: '2', v: 25}, {n: '3', v: 15}, {n: '4', v: 40}]}>
+                      <Area type="monotone" dataKey="v" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.1} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="card p-6">
+                  <p className="text-slate-500 text-xs uppercase font-bold mb-2">IP Address</p>
+                  <p className="text-xl font-mono">{container.ip_address || '10.0.3.142'}</p>
+                </div>
+                <div className="card p-6">
+                  <p className="text-slate-500 text-xs uppercase font-bold mb-2">Uptime</p>
+                  <p className="text-xl">12 days, 4 hours</p>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-6">
+              <div className="card p-6">
+                <h3 className="text-lg font-bold mb-4">Configuration</h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between py-2 border-b border-slate-800/50">
+                    <span className="text-slate-500">CPU Cores</span>
+                    <span className="font-medium">{container.cpu}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-slate-800/50">
+                    <span className="text-slate-500">Memory</span>
+                    <span className="font-medium">{container.ram} MB</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-slate-800/50">
+                    <span className="text-slate-500">Disk Space</span>
+                    <span className="font-medium">{container.disk} GB</span>
+                  </div>
+                  <div className="flex justify-between py-2">
+                    <span className="text-slate-500">Node</span>
+                    <span className="font-medium">{container.node_name}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'snapshots' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-bold">Container Snapshots</h3>
+              <button className="btn-primary flex items-center gap-2"><Plus size={16} /> Create Snapshot</button>
+            </div>
+            <div className="card overflow-hidden">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-slate-800/30 text-slate-400 text-xs uppercase tracking-wider">
+                    <th className="px-6 py-4 font-semibold">Name</th>
+                    <th className="px-6 py-4 font-semibold">Created</th>
+                    <th className="px-6 py-4 font-semibold text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50">
+                  {snapshots.length === 0 ? (
+                    <tr><td colSpan={3} className="px-6 py-12 text-center text-slate-500">No snapshots found</td></tr>
+                  ) : (
+                    snapshots.map(s => (
+                      <tr key={s.id}>
+                        <td className="px-6 py-4 font-medium">{s.name}</td>
+                        <td className="px-6 py-4 text-slate-400">{new Date(s.created_at).toLocaleString()}</td>
+                        <td className="px-6 py-4 text-right">
+                          <button className="p-2 text-blue-400 hover:bg-blue-500/10 rounded-lg"><RefreshCw size={18} /></button>
+                          <button className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg"><Trash2 size={18} /></button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'firewall' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-bold">Firewall Rules</h3>
+              <button className="btn-primary flex items-center gap-2"><Plus size={16} /> Add Rule</button>
+            </div>
+            <div className="card overflow-hidden">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-slate-800/30 text-slate-400 text-xs uppercase tracking-wider">
+                    <th className="px-6 py-4 font-semibold">Port</th>
+                    <th className="px-6 py-4 font-semibold">Protocol</th>
+                    <th className="px-6 py-4 font-semibold">Action</th>
+                    <th className="px-6 py-4 font-semibold text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50">
+                  {firewall.length === 0 ? (
+                    <tr><td colSpan={4} className="px-6 py-12 text-center text-slate-500">No firewall rules configured</td></tr>
+                  ) : (
+                    firewall.map(r => (
+                      <tr key={r.id}>
+                        <td className="px-6 py-4 font-medium">{r.port}</td>
+                        <td className="px-6 py-4 uppercase text-xs">{r.protocol}</td>
+                        <td className="px-6 py-4">
+                          <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 text-[10px] font-bold uppercase">{r.action}</span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg"><Trash2 size={18} /></button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'files' && (
+          <div className="card overflow-hidden">
+            <div className="bg-slate-800/30 px-6 py-3 flex items-center justify-between border-b border-slate-800">
+              <div className="flex items-center gap-2 text-sm text-slate-400">
+                <HardDrive size={16} />
+                <span>/var/www/html</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button className="p-1.5 hover:bg-slate-700 rounded text-slate-300"><Plus size={16} /></button>
+                <button className="p-1.5 hover:bg-slate-700 rounded text-slate-300"><RefreshCw size={16} /></button>
+              </div>
+            </div>
+            <div className="divide-y divide-slate-800/50">
+              {[
+                { name: 'index.php', size: '1.2 KB', type: 'file' },
+                { name: 'config.json', size: '450 B', type: 'file' },
+                { name: 'assets', size: '-', type: 'dir' },
+                { name: '.htaccess', size: '120 B', type: 'file' }
+              ].map(file => (
+                <div key={file.name} className="px-6 py-3 flex items-center justify-between hover:bg-slate-800/20 group cursor-pointer">
+                  <div className="flex items-center gap-3">
+                    {file.type === 'dir' ? <Globe size={18} className="text-blue-400" /> : <FileText size={18} className="text-slate-400" />}
+                    <span className="text-sm font-medium">{file.name}</span>
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <span className="text-xs text-slate-500">{file.size}</span>
+                    <div className="opacity-0 group-hover:opacity-100 flex items-center gap-2">
+                      <button className="p-1 hover:text-blue-400"><Settings size={14} /></button>
+                      <button className="p-1 hover:text-red-400"><Trash2 size={14} /></button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'console' && (
+          <div className="card bg-black p-6 font-mono text-sm min-h-[400px] border-slate-800">
+            <div className="text-emerald-500 mb-2">Connected to {container.name} via WebSSH...</div>
+            <div className="text-slate-300">
+              root@{container.name.toLowerCase()}:~# ls -la<br />
+              total 28<br />
+              drwx------  4 root root 4096 Feb 22 08:24 .<br />
+              drwxr-xr-x 20 root root 4096 Feb 22 08:24 ..<br />
+              -rw-r--r--  1 root root  571 Apr 10  2021 .bashrc<br />
+              -rw-r--r--  1 root root  161 Jul  9  2019 .profile<br />
+              root@{container.name.toLowerCase()}:~# <span className="animate-pulse">_</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const AppContent = () => {
+  const { isAuthenticated } = useAuth();
+  const [config, setConfig] = useState<{ panelName: string, watermark: string, welcomeMessage: string } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(setConfig);
+  }, []);
+
+  if (!isAuthenticated) return <Login config={config} />;
+
+  return (
+    <Layout config={config}>
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/containers" element={<Containers />} />
+        <Route path="/containers/:id" element={<ContainerDetails />} />
         <Route path="/nodes" element={<Nodes />} />
         <Route path="/network" element={<NetworkPage />} />
-        <Route path="/packages" element={<div className="card p-8 text-center text-slate-500">Packages Management coming soon</div>} />
-        <Route path="/users" element={<div className="card p-8 text-center text-slate-500">Users Management coming soon</div>} />
-        <Route path="/backups" element={<div className="card p-8 text-center text-slate-500">Backups Management coming soon</div>} />
-        <Route path="/logs" element={<div className="card p-8 text-center text-slate-500">System Logs coming soon</div>} />
+        <Route path="/packages" element={<PackagesPage />} />
+        <Route path="/users" element={<UsersPage />} />
+        <Route path="/backups" element={<BackupsPage />} />
+        <Route path="/logs" element={<LogsPage />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Layout>

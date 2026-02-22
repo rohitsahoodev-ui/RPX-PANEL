@@ -7,11 +7,15 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import path from "path";
 import fs from "fs";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const execAsync = promisify(exec);
 const app = express();
 const PORT = 3000;
-const JWT_SECRET = "rpx-panel-secret-key-123";
+const JWT_SECRET = process.env.SECRET_KEY || "rpx-panel-secret-key-123";
+const PANEL_NAME = process.env.PANEL_NAME || "RDX VPS Panel";
 
 app.use(express.json());
 
@@ -67,21 +71,52 @@ db.exec(`
     FOREIGN KEY(container_id) REFERENCES containers(id)
   );
 
-  CREATE TABLE IF NOT EXISTS packages (
+  CREATE TABLE IF NOT EXISTS snapshots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT UNIQUE,
-    ram INTEGER,
-    cpu INTEGER,
-    disk INTEGER,
-    bandwidth INTEGER
+    container_id INTEGER,
+    name TEXT,
+    description TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(container_id) REFERENCES containers(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS backups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    container_id INTEGER,
+    name TEXT,
+    size INTEGER,
+    status TEXT DEFAULT 'completed',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(container_id) REFERENCES containers(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS firewall_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    container_id INTEGER,
+    port INTEGER,
+    protocol TEXT,
+    action TEXT DEFAULT 'allow',
+    FOREIGN KEY(container_id) REFERENCES containers(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS activity_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    action TEXT,
+    details TEXT,
+    ip_address TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id)
   );
 `);
 
 // Create default admin if not exists
-const adminExists = db.prepare("SELECT * FROM users WHERE username = 'admin'").get();
+const adminUsername = process.env.ADMIN_USERNAME || "admin";
+const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
+const adminExists = db.prepare("SELECT * FROM users WHERE username = ?").get(adminUsername);
 if (!adminExists) {
-  const hashedPassword = bcrypt.hashSync("admin123", 10);
-  db.prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)").run("admin", hashedPassword, "admin");
+  const hashedPassword = bcrypt.hashSync(adminPassword, 10);
+  db.prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)").run(adminUsername, hashedPassword, "admin");
 }
 
 // Create local node if not exists
@@ -107,7 +142,26 @@ const isAdmin = (req: any, res: any, next: any) => {
   next();
 };
 
+// Middleware: Activity Logger
+const logActivity = (action: string, details: string) => (req: any, res: any, next: any) => {
+  const userId = req.user?.id;
+  const ip = req.ip;
+  db.prepare("INSERT INTO activity_logs (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)").run(
+    userId, action, details, ip
+  );
+  next();
+};
+
 // --- API Routes ---
+
+// Public Config
+app.get("/api/config", (req, res) => {
+  res.json({
+    panelName: process.env.PANEL_NAME || "RDX VPS Panel",
+    watermark: process.env.WATERMARK || "RDX VPS Service",
+    welcomeMessage: process.env.WELCOME_MESSAGE || "Welcome to RDX VPS Panel"
+  });
+});
 
 // Auth
 app.post("/api/auth/login", (req, res) => {
@@ -265,6 +319,54 @@ app.post("/api/port-forwards", authenticate, (req, res) => {
   }
 });
 
+// Snapshots
+app.get("/api/containers/:id/snapshots", authenticate, (req, res) => {
+  const snapshots = db.prepare("SELECT * FROM snapshots WHERE container_id = ?").all(req.params.id);
+  res.json(snapshots);
+});
+
+app.post("/api/containers/:id/snapshots", authenticate, (req, res) => {
+  const { name, description } = req.body;
+  try {
+    db.prepare("INSERT INTO snapshots (container_id, name, description) VALUES (?, ?, ?)").run(
+      req.params.id, name, description
+    );
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// Firewall
+app.get("/api/containers/:id/firewall", authenticate, (req, res) => {
+  const rules = db.prepare("SELECT * FROM firewall_rules WHERE container_id = ?").all(req.params.id);
+  res.json(rules);
+});
+
+app.post("/api/containers/:id/firewall", authenticate, (req, res) => {
+  const { port, protocol, action } = req.body;
+  try {
+    db.prepare("INSERT INTO firewall_rules (container_id, port, protocol, action) VALUES (?, ?, ?, ?)").run(
+      req.params.id, port, protocol, action
+    );
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// Activity Logs
+app.get("/api/logs", authenticate, isAdmin, (req, res) => {
+  const logs = db.prepare(`
+    SELECT al.*, u.username 
+    FROM activity_logs al 
+    JOIN users u ON al.user_id = u.id 
+    ORDER BY al.created_at DESC 
+    LIMIT 100
+  `).all();
+  res.json(logs);
+});
+
 // Packages
 app.get("/api/packages", authenticate, (req, res) => {
   const packages = db.prepare("SELECT * FROM packages").all();
@@ -297,7 +399,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`RPX PANEL running on http://localhost:${PORT}`);
+    console.log(`${PANEL_NAME} running on http://localhost:${PORT}`);
   });
 }
 

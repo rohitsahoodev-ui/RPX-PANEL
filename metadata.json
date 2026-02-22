@@ -1,5 +1,5 @@
 {
-  "name": "RPX PANEL",
+  "name": "RDX VPS Panel",
   "description": "Advanced VPS Control Panel with LXC/LXD support, multi-node management, and port forwarding.",
   "requestFramePermissions": []
 }
