@@ -99,6 +99,23 @@ If `npm run build` or `npm start` fails with "not found":
    - `npx vite build`
    - `npx tsx server.ts`
 
+### 🚨 Quick Fix: "npm ERR! gyp ERR!"
+If `npm install` fails with a "gyp" error, it means the database driver (`better-sqlite3`) couldn't compile.
+**Fix**: Install the required build tools and try again:
+```bash
+sudo apt update
+sudo apt install -y build-essential python3
+npm install
+```
+
+### 🚨 Quick Fix: "command not found" (vite, tsx, etc.)
+If you see "not found" errors, it means your dependencies are not installed.
+Run this command to fix it:
+```bash
+npm install --include=dev
+```
+Then try `npm run build` again.
+
 ### Troubleshooting: "Unknown file extension .ts"
 If you see an error like `ERR_UNKNOWN_FILE_EXTENSION`, it means Node is trying to run the `.ts` file directly without a transpiler. 
 **Solution**: Ensure you are using `npm start` (which now uses `tsx`) or run it manually using `npx tsx server.ts`.
